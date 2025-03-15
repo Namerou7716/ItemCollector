@@ -37,27 +37,23 @@ class Item
 private:
 	Circle itemCollision;
 	int32 itemType;
+	const double fallSpeed{ 200 };
 public:
 	Item()
 	{
 		itemCollision = Circle{ Random(70,730),20,35 };
 		itemType = Random(0, 1);
 	}
-	void draw()const
+	void draw(const Array<Texture>itemTextures)const
 	{
-		switch (this->itemType)
-		{
-		default:
-			break;
-		case 0:
-			itemCollision.draw(Palette::White);
-			break;
-		case 1:
-			itemCollision.draw(Palette::Red);
-			break;
-		}
+		itemTextures[itemType].scaled(0.5).draw(itemCollision.center);
+	}
+	void update(double deltaTime)
+	{
+
 	}
 };
+
 
 /*
 * 背景描画
@@ -73,17 +69,18 @@ void DrawBackground()
 /*
 * アイテムをまとめて描画する関数
 */
-void DrawItems(const Array<Item>& items)
+void DrawItems(const Array<Item>& items, const Array<Texture>& itemTextures)
 {
 	for (const auto& item : items)
 	{
-		item.draw();
+		item.draw(itemTextures);
 	}
 }
 void Main()
 {
 	Player player;
 	Array<Item>items;
+	Array<Texture>itemTextureList{ Texture{U"🍬"_emoji},Texture{U"🍰"_emoji } };
 	items << Item{};
 	items << Item{};
 
@@ -104,7 +101,7 @@ void Main()
 		*/
 		DrawBackground();
 		player.draw();
-		DrawItems(items);
+		DrawItems(items, itemTextureList);
 	}
 }
 
