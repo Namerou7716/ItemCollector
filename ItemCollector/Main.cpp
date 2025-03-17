@@ -6,11 +6,11 @@
 class Item
 {
 private:
-	int32 itemType;
 	double fallSpeed{ 200 };
 public:
 	Circle itemCollision;
 	Vec2 position;
+	int32 itemType;
 public:
 	Item()
 	{
@@ -20,7 +20,7 @@ public:
 	}
 	void draw(const Array<Texture>itemTextures)const
 	{
-		itemTextures[itemType].scaled(0.5).draw(itemCollision.center);
+		itemTextures[itemType].scaled(0.5).rotated(itemCollision.y * 0.3_deg).draw(itemCollision.center);
 	}
 	void update(double deltaTime)
 	{
@@ -96,6 +96,11 @@ public:
 		return false;
 	}
 
+	double getRemainTime()
+	{
+		return periodTime - accumelateTime;
+	}
+
 };
 /*
 * 背景描画関数
@@ -127,8 +132,20 @@ void UpdateItems(Array<Item>& items, double deltaTime, Player& player)
 	{
 		item.update(deltaTime);
 	}
-	//プレイヤーと交差したら消す
-	items.remove_if([&](const Item& item) {return player.IsTouchItem(item); });
+
+	//イテレータで交差判別、交差していたらスコアを加算して消す
+	for (auto item = items.begin(); item != items.end();)
+	{
+		if (player.playerCollision.intersects(item->itemCollision))
+		{
+			player.score += ((item->itemType == 0) ? 10 : 50);
+			item = items.erase(item);
+		}
+		else
+		{
+			++item;
+		}
+	}
 	//地面についたら消す
 	items.remove_if([](Item item) { return item.position.y > 450; });
 }
@@ -136,9 +153,17 @@ void UpdateItems(Array<Item>& items, double deltaTime, Player& player)
 /*
 * UI描画関数
 */
-void DrawUI(Font font, int32 score)
+void DrawUI(Font font, int32 score, double time)
 {
+	if (time < 0.0)
+	{
+		font(U"Time's up").drawAt(50, 400, 200, ColorF(0.2));
+		font(U"Total Score:{}"_fmt(score)).drawAt(30, 400, 300, ColorF(0.2));
+		font(U"Restart : EnterKey").drawAt(20, 400, 400, ColorF(0.2));
+		return;
+	}
 	font(U"Score : {}"_fmt(score)).draw(Arg::topLeft(10, 10), ColorF(0.2));
+	font(U"Time:{:.0f}"_fmt(time)).draw(Arg::topRight(780, 10), ColorF(0.2));
 }
 
 void Main()
@@ -146,7 +171,8 @@ void Main()
 	Player player;
 	Array<Item>items;
 	Array<Texture>itemTextureList{ Texture{U"🍬"_emoji},Texture{U"🍰"_emoji } };
-	PeriodTimer timer{ 0.8 };
+	PeriodTimer itemSpawnTimer{ 0.8 };
+	PeriodTimer timeLimitTimer{ 10 };
 	Font font{ FontMethod::MSDF,40,Typeface::Bold };
 
 	while (System::Update())
@@ -155,12 +181,25 @@ void Main()
 		/*
 		*更新
 		*/
-		player.update(deltaTime);
-		UpdateItems(items, deltaTime, player);
-		timer.updateTime(deltaTime);
-		if (timer.checkAccumelate())
+		if (timeLimitTimer.getRemainTime() >= 0)
 		{
-			items << Item{};
+			player.update(deltaTime);
+			UpdateItems(items, deltaTime, player);
+			itemSpawnTimer.updateTime(deltaTime);
+			timeLimitTimer.updateTime(deltaTime);
+			if (itemSpawnTimer.checkAccumelate())
+			{
+				items << Item{};
+			}
+		}
+		else
+		{
+			items.clear();
+			if (KeyEnter.down())
+			{
+				player.score = 0;
+				timeLimitTimer = PeriodTimer{ 10 };
+			}
 		}
 		/*
 		* 描画
@@ -168,7 +207,7 @@ void Main()
 		DrawBackground();
 		player.draw();
 		DrawItems(items, itemTextureList);
-		DrawUI(font, player.score);
+		DrawUI(font, player.score, timeLimitTimer.getRemainTime());
 	}
 }
 
